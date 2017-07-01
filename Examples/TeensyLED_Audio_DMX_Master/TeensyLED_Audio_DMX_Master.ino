@@ -128,6 +128,26 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 // ----------------------------------------------------------------------
+#define numLights 216
+void writecolors();
+void hsi2rgb(float H, float S, float I, int* rgb);
+/*
+ * Octows2811 stuff
+ */
+#include <OctoWS2811.h>
+
+const int ledsPerStrip = numLights ;
+
+DMAMEM int displayMemory[ledsPerStrip*6];
+int drawingMemory[ledsPerStrip*6];
+
+const int config = WS2811_GRB | WS2811_800kHz;
+
+OctoWS2811 leds(ledsPerStrip, displayMemory, drawingMemory, config);
+
+/*endo octows2811 stuff
+ * 
+ */
 
 #include <DmxSimple.h>
 
@@ -153,8 +173,10 @@
 // same starting with DMX Channel 3 for red. I used here fully
 // saturated colors, so did not need to keep track of the saturation.
 
-float huearray[8] = {0, 45, 90, 135, 180, 225, 270, 315};
-float intensityarray[8] = {intensityMin, intensityMin, intensityMin, intensityMin, intensityMin, intensityMin, intensityMin, intensityMin};
+
+float huearray[numLights];
+float intensityarray[numLights];
+
 
 // Flag to indicate that a beat has been detected. Beats are only
 // recognized every DMX update (10ms default) which incidentally also
@@ -193,12 +215,31 @@ elapsedMillis beatTimer;
 elapsedMillis sendtimer;
 
 void setup() {
+/*
+ * Octows2811 stuff
+ */
+   leds.begin();
+  leds.show();
+
+  /* endo octows2811 stuff
+   *  
+   */
+
+   for (int i=0; i<numLights; i++) {
+huearray[i] = 360/numLights * i;
+intensityarray[i]=intensityMin;
+}
+
+
   // I like to delay for a second so that serial is up and running before
   // the code starts in earnest.
-  
+  Serial.begin(115200);
   delay(1000);
   Serial.println("TeensyLED Audio Analysis System Operational.");
-  
+
+  /* Dont need dmx stuff
+    
+   
   // Setup for the DMX Simple Library. Pin 1 is the TX pin on the Teensy.
   // A better DMX library would allow me to send packets using the hardware
   // UART on that pin, but it works fine as is.
@@ -227,7 +268,9 @@ void setup() {
   // Teensy 3.1 ADC. It would be fine to use 16 bits but I didn't see much
   // point between the noise in the ADC and the noise intrinsic in the audio
   // signal.
-  
+  /* end dmx stuff
+   *  
+   */
   analogReadResolution(13);
 
   // Set the audio zero level to ~4096 to start since it should be roughly
@@ -258,6 +301,10 @@ void setup() {
 
 void loop() {
 
+   
+    leds.show();
+    //delayMicroseconds(wait);
+  
   // This portion handles audio sampling and analysis.
   
   if (audioSamplingTimer > 22) { // No, really, 22us is roughly 44.1kHz! Coincidence?
@@ -265,8 +312,8 @@ void loop() {
     
     // Input capacitively coupled, mid-scale centered audio signal.
     
-    float audioSignal = analogRead(0);
-  
+    float audioSignal = analogRead(23);
+    Serial.println(audioSignal);
     // Use exponential smoothing to capture the DC offset. This is using
     // the pure audio signal which should always have a stable DC offset
     // due to being capacitively coupled to the analog input.
@@ -324,7 +371,7 @@ void loop() {
   if (sendtimer >= timestep) {
     sendtimer = sendtimer - timestep;
 
-    for (unsigned int i=0; i<8; i++) {
+    for (unsigned int i=0; i<numLights; i++) {
       // Rotate hue of all lights based on parameters at the start of the program.
       huearray[i] = fmod(huearray[i] + ((float)timestep/1000)*hueStepPerSecond, 360);
     }
@@ -347,7 +394,7 @@ void loop() {
 
       // Set the light brightnesses to the normalized volume immediately.
       
-      for (unsigned int i=0; i<8; i++) {
+      for (unsigned int i=0; i<numLights; i++) {
         intensityarray[i] = max(peakBeatVolume, intensityarray[i]);
       }
 
@@ -359,7 +406,7 @@ void loop() {
     // The decay speed varies based on song genre and the constants above.
     
     float timeConstant = min(timestep/lightDecayPeriod, 0.5);
-    for (unsigned int i=0; i<8; i++) {
+    for (unsigned int i=0; i<numLights; i++) {
       intensityarray[i] = (1-timeConstant)*intensityarray[i] + timeConstant*intensityMin;
     }
 
@@ -389,21 +436,24 @@ void loop() {
     // Debug information about the beat detection tuning, which is infrequent enough
     // that I left it uncommented here.
     
-    Serial.println("Detected " + String(beatCountsFiltered) + " BPS, target is " + String(bpsTarget) + ". New threshold is " + String(dThreshold) + ". Pulse decay TC is " + String(lightDecayPeriod));
+    //gav Serial.println("Detected " + String(beatCountsFiltered) + " BPS, target is " + String(bpsTarget) + ". New threshold is " + String(dThreshold) + ". Pulse decay TC is " + String(lightDecayPeriod));
     beatCounts = 0;
   }
 }
 
 void writecolors() {
-  for (unsigned int i=0; i<8; i++) {    
+  for (unsigned int i=0; i<numLights; i++) {    
     // Convert hue to RGB value assuming fully saturated and full brightness.
     int rgb[3];
     hsi2rgb(huearray[i], 1, intensityarray[i], rgb);
-
+    leds.setPixel(i, rgb[0],rgb[1],rgb[2]);
+    /*
     // Write them out to the DMX port.
     DmxSimple.write(i*3, rgb[0]);
     DmxSimple.write(i*3+1, rgb[1]);
     DmxSimple.write(i*3+2, rgb[2]);
+    */
+       
   }
 }
 
