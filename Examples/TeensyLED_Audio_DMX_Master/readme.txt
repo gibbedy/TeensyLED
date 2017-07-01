@@ -1,3 +1,8 @@
+This is a slightly modified TeensyLED_Audio_DMX_Master to use octows2811 library for rgb output.
+At the moment I have only tested that the LED hue changes work as I haven't got analog audio hooked up.
+
+
+
 TeensyLED Audio DMX Master
 Version 0.9
 Copyright Brian Neltner 2016
